@@ -119,6 +119,12 @@ class BernoulliSimulation:
         self.dragging = False
         self.active_view = None  # To track which view is being interacted with
         
+        # Ball velocity and constraints
+        self.ball_vx = 0  # x-direction velocity
+        self.ball_vz = 0  # z-direction velocity
+        self.max_velocity_x = 15  # Maximum velocity in x direction
+        self.velocity_damping = 0.9  # Velocity damping factor (for smooth deceleration)
+        
         # Calculate ball mass based on radius (assuming constant density)
         # Using a simple formula: mass = density * volume = density * (4/3) * pi * r^3
         # For simplicity, we'll use a scale factor to convert radius to mass
@@ -331,9 +337,9 @@ class BernoulliSimulation:
         
         # Draw panel labels
         xy_label = self.title_font.render("XY 視圖 (側視圖)", True, BLUE)
-        xz_label = self.title_font.render("XZ 視圖 (俯視圖)", True, BLUE)
+        zx_label = self.title_font.render("ZX 視圖 (俯視圖)", True, BLUE)
         self.screen.blit(xy_label, (24, 18))
-        self.screen.blit(xz_label, (self.current_view_width + self.middle_section_width + 24, 18))
+        self.screen.blit(zx_label, (self.current_view_width + self.middle_section_width + 24, 18))
         
         # Draw coordinate axes in XY view
         axes_length = int(self.current_height * 0.07)
@@ -349,14 +355,14 @@ class BernoulliSimulation:
         # Draw coordinate axes in XZ view
         pygame.draw.line(self.screen, BLACK, 
                         (self.current_view_width + self.middle_section_width + 10, self.current_height - 30), 
-                        (self.current_view_width + self.middle_section_width + 10 + axes_length, self.current_height - 30), 2)  # X-axis
+                        (self.current_view_width + self.middle_section_width + 10 + axes_length, self.current_height - 30), 2)  # Z-axis
         pygame.draw.line(self.screen, BLACK, 
                         (self.current_view_width + self.middle_section_width + 10, self.current_height - 30), 
-                        (self.current_view_width + self.middle_section_width + 10, self.current_height - 30 - axes_length), 2)  # Z-axis
-        x_label = self.font.render("X", True, BLACK)
+                        (self.current_view_width + self.middle_section_width + 10, self.current_height - 30 - axes_length), 2)  # X-axis
         z_label = self.font.render("Z", True, BLACK)
-        self.screen.blit(x_label, (self.current_view_width + self.middle_section_width + 10 + axes_length, self.current_height - 30))
-        self.screen.blit(z_label, (self.current_view_width + self.middle_section_width + 10, self.current_height - 30 - axes_length))
+        x_label = self.font.render("X", True, BLACK)
+        self.screen.blit(z_label, (self.current_view_width + self.middle_section_width + 10 + axes_length, self.current_height - 30))
+        self.screen.blit(x_label, (self.current_view_width + self.middle_section_width + 10, self.current_height - 30 - axes_length))
         
         # Draw sliders in the middle section
         middle_x = self.current_view_width + self.middle_section_width // 2
@@ -480,7 +486,8 @@ class BernoulliSimulation:
             (f"X: {self.ball_pos[0]:.1f}", BLACK),
             (f"Y: {self.ball_pos[1]:.1f}", BLACK),
             (f"Z: {self.ball_pos[2]:.1f}", BLACK),
-            (f"Z速度: {getattr(self, 'ball_vz', 0):.2f}", (80,80,80))
+            (f"X速度: {self.ball_vx:.2f} m/s", (0, 120, 0) if abs(self.ball_vx) < 0.5 else (200, 0, 0)),
+            (f"Z速度: {self.ball_vz:.2f} m/s", (0, 120, 0) if abs(self.ball_vz) < 0.5 else (200, 0, 0))
         ]
         
         # Draw semi-transparent background for position info
@@ -592,6 +599,8 @@ class BernoulliSimulation:
             "- 按 'I' 鍵隱藏/顯示此信息",
             "- 按 'F' 鍵切換全屏模式",
             "- 在兩個視圖中拖動球體可改變其位置",
+            "- 球體移動有速度限制，防止過快移動",
+            "- 釋放球體後，它會逐漸減速停下",
             "- 調整中間的滑桿來改變模擬參數"
         ]
         
@@ -691,17 +700,44 @@ class BernoulliSimulation:
             elif event.type == MOUSEMOTION:
                 if self.dragging:
                     if self.active_view == "xy":
-                        # Update ball position in XY view
-                        self.ball_pos[0] = min(max(event.pos[0], self.ball_radius), 
-                                              self.current_view_width - self.ball_radius)
+                        # Get new position from mouse
+                        new_x = min(max(event.pos[0], self.ball_radius), 
+                                   self.current_view_width - self.ball_radius)
+                        
+                        # Calculate velocity based on position change
+                        dx = new_x - self.ball_pos[0]
+                        
+                        # Apply velocity constraint
+                        if abs(dx) > self.max_velocity_x:
+                            dx = self.max_velocity_x if dx > 0 else -self.max_velocity_x
+                        
+                        # Update position and track velocity
+                        self.ball_vx = dx
+                        self.ball_pos[0] += dx
                         self.ball_pos[1] = min(max(event.pos[1], self.ball_radius), 
                                               self.current_height - self.ball_radius)
                     elif self.active_view == "xz":
-                        # Update ball position in XZ view
-                        self.ball_pos[0] = min(max(event.pos[0] - (self.current_view_width + self.middle_section_width), 
-                                                  self.ball_radius), 
-                                              self.current_view_width - self.ball_radius)
-                        self.ball_pos[2] = self.current_height // 2 - event.pos[1]  # Convert y-coordinate to z
+                        # Get new position from mouse for ZX view
+                        new_x = min(max(event.pos[0] - (self.current_view_width + self.middle_section_width), 
+                                       self.ball_radius), 
+                                   self.current_view_width - self.ball_radius)
+                        
+                        # Calculate velocity based on position change
+                        dx = new_x - self.ball_pos[0]
+                        
+                        # Apply velocity constraint
+                        if abs(dx) > self.max_velocity_x:
+                            dx = self.max_velocity_x if dx > 0 else -self.max_velocity_x
+                        
+                        # Update position and track velocity
+                        self.ball_vx = dx
+                        self.ball_pos[0] += dx
+                        
+                        # Calculate new z position and velocity
+                        new_z = self.current_height // 2 - event.pos[1]
+                        dz = new_z - self.ball_pos[2]
+                        self.ball_vz = dz
+                        self.ball_pos[2] = new_z
                 
                 if self.active_slider:
                     # Calculate slider positions dynamically
@@ -742,9 +778,35 @@ class BernoulliSimulation:
             pass  # 直接用滑桿值即可
     
     def run(self):
+        last_time = pygame.time.get_ticks()
+        
         while True:
+            # Calculate delta time for physics updates
+            current_time = pygame.time.get_ticks()
+            dt = (current_time - last_time) / 1000.0  # Convert to seconds
+            last_time = current_time
+            
             # Handle events
             self.handle_events()
+            
+            # Apply physics when not dragging
+            if not self.dragging:
+                # Apply velocity damping
+                self.ball_vx *= self.velocity_damping
+                self.ball_vz *= self.velocity_damping
+                
+                # Apply velocity constraints
+                if abs(self.ball_vx) > self.max_velocity_x:
+                    self.ball_vx = self.max_velocity_x if self.ball_vx > 0 else -self.max_velocity_x
+                
+                # Update position based on velocity
+                new_x = self.ball_pos[0] + self.ball_vx
+                new_z = self.ball_pos[2] + self.ball_vz
+                
+                # Apply boundary constraints
+                self.ball_pos[0] = min(max(new_x, self.ball_radius), 
+                                      self.current_view_width - self.ball_radius)
+                self.ball_pos[2] = new_z  # Z can move freely
             
             # Generate new particles
             self.generate_particles()
