@@ -203,22 +203,45 @@ class BernoulliSimulation:
         lift_coefficient = 0.47  # 固定球體升力係數
         vertical_thrust = self.sliders["vertical_thrust"]["value"]
         
-        # 伯努利方程計算
-        # 假設球體上方流速較快，下方流速較慢
-        # 上方流速 = 來流速度 + 加速效應
-        velocity_top = effective_velocity * 1.5  # 上表面流速加快50%
-        velocity_bottom = effective_velocity * 0.8  # 下表面流速減慢20%
+        # 伯努利方程計算 - 更精確的實現
+        # 根據伯努利原理：P + ½ρv² + ρgh = 常數
         
-        # 根據伯努利方程，P + ½ρv² + ρgh = 常數
-        # 假設高度項相同，則壓力差由速度差決定
-        pressure_top = AIR_DENSITY * (velocity_top**2) / 2
-        pressure_bottom = AIR_DENSITY * (velocity_bottom**2) / 2
+        # 計算流線分離點的角度 (約75度)
+        separation_angle = math.radians(75)
+        
+        # 計算球體表面各點的速度分佈
+        # 在球體前方，流速減慢；頂部和底部，流速加快；後方形成渦流
+        
+        # 前方淹點流速為零
+        stagnation_velocity = 0
+        
+        # 頂部流速最大 (理論上是來流速度的2倍)
+        top_velocity = effective_velocity * 2.0
+        
+        # 底部流速較慢 (由於流線分離和渦流)
+        bottom_velocity = effective_velocity * 1.2
+        
+        # 根據伯努利方程，計算壓力
+        # P = P₀ - ½ρv²，其中P₀是靜止壓力
+        
+        # 假設靜止壓力為標準大氣壓
+        p0 = 101325  # 帕斯卡
+        
+        # 計算各點壓力
+        pressure_stagnation = p0 + 0.5 * AIR_DENSITY * (effective_velocity**2)  # 前方淹點壓力最高
+        pressure_top = p0 - 0.5 * AIR_DENSITY * (top_velocity**2)  # 頂部壓力最低
+        pressure_bottom = p0 - 0.5 * AIR_DENSITY * (bottom_velocity**2)  # 底部壓力較低但高於頂部
         
         # 壓力差（下表面壓力較大，上表面壓力較小）
         pressure_diff = pressure_bottom - pressure_top
         
-        # Calculate lift force
-        lift_force = pressure_diff * area
+        # 計算升力
+        # 升力 = 壓力差 × 投影面積 × 升力係數
+        lift_force = pressure_diff * area * lift_coefficient
+        
+        # 計算阻力 (與速度平方成正比)
+        drag_coefficient = 0.47  # 球體的阻力係數
+        drag_force = 0.5 * AIR_DENSITY * (effective_velocity**2) * area * drag_coefficient
         
         # Calculate ball mass based on radius
         ball_mass = (4/3) * math.pi * (self.ball_radius/100)**3 * (1/self.density_factor)
@@ -233,13 +256,14 @@ class BernoulliSimulation:
             "pressure_top": pressure_top,
             "pressure_bottom": pressure_bottom,
             "pressure_diff": pressure_diff,
-            "velocity_top": velocity_top,
-            "velocity_bottom": velocity_bottom,
+            "velocity_top": top_velocity,
+            "velocity_bottom": bottom_velocity,
             "lift_force": lift_force,
             "weight": weight,
             "net_force": net_force,
             "ball_mass": ball_mass,
-            "vertical_thrust": vertical_thrust
+            "vertical_thrust": vertical_thrust,
+            "drag_force": drag_force
         }
     
     def draw_ball(self):
@@ -290,6 +314,112 @@ class BernoulliSimulation:
             pygame.draw.line(self.screen, BLUE, 
                             (self.ball_pos[0], self.ball_pos[1]), 
                             (self.ball_pos[0], vert_end_y), 3)
+        
+        # 繪製伯努利效應的流線和壓力分佈
+        self.draw_bernoulli_effects(self.ball_pos[0], self.ball_pos[1], self.ball_radius, angle_rad)
+        self.draw_bernoulli_effects(xz_x, xz_y, self.ball_radius, angle_rad, is_xz_view=True)
+    
+    def draw_bernoulli_effects(self, x, y, radius, angle_rad, is_xz_view=False):
+        """繪製伯努利效應的流線和壓力分佈"""
+        # 繪製流線
+        num_streamlines = 8
+        streamline_length = radius * 3
+        streamline_points = 20
+        
+        # 計算流線起點
+        start_angle = angle_rad + math.pi  # 從球體上游開始
+        start_radius = radius * 1.5
+        
+        for i in range(num_streamlines):
+            # 計算垂直於風向的偏移
+            offset = (i - num_streamlines/2 + 0.5) * radius / (num_streamlines/3)
+            
+            # 起點座標
+            start_x = x + math.cos(start_angle) * start_radius
+            start_y = y + math.sin(start_angle) * start_radius
+            
+            # 垂直於風向的偏移
+            perp_angle = angle_rad + math.pi/2
+            start_x += math.cos(perp_angle) * offset
+            if not is_xz_view:  # XY視圖才移動Y座標
+                start_y += math.sin(perp_angle) * offset
+            
+            # 繪製流線
+            points = []
+            for j in range(streamline_points):
+                # 流線長度參數
+                t = j / (streamline_points - 1)
+                dist = streamline_length * t
+                
+                # 基本位置
+                point_x = start_x + math.cos(angle_rad) * dist
+                point_y = start_y
+                if not is_xz_view:  # XY視圖才移動Y座標
+                    point_y += math.sin(angle_rad) * dist
+                
+                # 計算到球心的距離
+                dx = point_x - x
+                dy = point_y - y
+                distance = math.sqrt(dx*dx + dy*dy)
+                
+                # 流線繞球體彎曲
+                if distance < radius * 2:
+                    # 計算偏移量，越接近球體偏移越大
+                    deflection = max(0, 1 - distance / (radius * 2))
+                    deflection_amount = radius * deflection * 1.5
+                    
+                    # 根據流線位置決定偏移方向
+                    deflection_dir = 1 if offset > 0 else -1
+                    
+                    # 應用偏移
+                    perp_angle = angle_rad + math.pi/2
+                    point_x += math.cos(perp_angle) * deflection_amount * deflection_dir
+                    if not is_xz_view:  # XY視圖才移動Y座標
+                        point_y += math.sin(perp_angle) * deflection_amount * deflection_dir
+                
+                points.append((point_x, point_y))
+            
+            # 繪製流線
+            if len(points) > 1:
+                # 根據流速決定顏色
+                if abs(offset) < radius * 0.5:
+                    # 靠近球體中心的流線速度較快，顏色較深
+                    color = (0, 0, 200, 150)
+                else:
+                    # 遠離球體中心的流線速度較慢，顏色較淺
+                    color = (100, 150, 255, 150)
+                
+                # 繪製平滑曲線
+                pygame.draw.aalines(self.screen, color, False, points, 2)
+                
+                # 在流線末端繪製箭頭
+                if len(points) >= 2:
+                    end_point = points[-1]
+                    pre_end_point = points[-2]
+                    
+                    # 計算箭頭方向
+                    arrow_dx = end_point[0] - pre_end_point[0]
+                    arrow_dy = end_point[1] - pre_end_point[1]
+                    arrow_len = math.sqrt(arrow_dx*arrow_dx + arrow_dy*arrow_dy)
+                    
+                    if arrow_len > 0:
+                        arrow_dx /= arrow_len
+                        arrow_dy /= arrow_len
+                        
+                        # 箭頭尺寸
+                        arrow_size = 5
+                        
+                        # 箭頭兩側點
+                        arrow_perp_x = -arrow_dy
+                        arrow_perp_y = arrow_dx
+                        
+                        p1 = (end_point[0] - arrow_dx * arrow_size + arrow_perp_x * arrow_size,
+                              end_point[1] - arrow_dy * arrow_size + arrow_perp_y * arrow_size)
+                        p2 = (end_point[0] - arrow_dx * arrow_size - arrow_perp_x * arrow_size,
+                              end_point[1] - arrow_dy * arrow_size - arrow_perp_y * arrow_size)
+                        
+                        # 繪製箭頭
+                        pygame.draw.polygon(self.screen, color, [end_point, p1, p2])
     
     def draw_particles(self):
         # Clear the particle surfaces
@@ -445,6 +575,7 @@ class BernoulliSimulation:
         info_y = int(self.current_height * 0.15)
         
         info_texts = [
+            ("伯努利原理數據:", BLUE),
             ("上表面壓力 (Pressure on Top)", BLACK),
             (f"  {forces['pressure_top']:.2f} Pa", BLACK),
             ("上表面流速 (Velocity on Top)", BLUE),
@@ -457,6 +588,8 @@ class BernoulliSimulation:
             (f"  {forces['pressure_diff']:.2f} Pa", BLUE),
             ("升力 (Lift)", GREEN),
             (f"  {forces['lift_force']:.2f} N", GREEN),
+            ("阻力 (Drag)", RED),
+            (f"  {forces['drag_force']:.2f} N", RED),
             ("球體質量 (Ball Mass)", BLACK),
             (f"  {forces['ball_mass']:.2f} kg", BLACK),
             ("重力 (Weight)", RED),
@@ -588,9 +721,20 @@ class BernoulliSimulation:
             "",
             "伯努利方程式: P₁ + ½ρv₁² + ρgh₁ = P₂ + ½ρv₂² + ρgh₂",
             "",
+            "其中:",
+            "- P 是壓力",
+            "- ρ 是流體密度",
+            "- v 是流體速度",
+            "- g 是重力加速度",
+            "- h 是高度",
+            "",
             "當空氣流過球體時，上表面的空氣流動較快，",
             "因此產生較低的壓力。下表面的空氣流動較慢，",
             "壓力較高，這種壓力差產生向上的升力。",
+            "",
+            "在球體前方形成淹點，流速為零，壓力最高；",
+            "在球體頂部，流速最快，壓力最低；",
+            "在球體後方形成渦流區，壓力不均勻。",
             "",
             "這個原理解釋了飛機機翼如何產生升力，以及",
             "許多其他流體動力學現象。",
