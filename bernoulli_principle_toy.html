@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>伯努利原理科学玩具</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Arial', sans-serif;
+            overflow: hidden;
+        }
+        
+        #container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        #controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            z-index: 100;
+            max-width: 300px;
+        }
+        
+        .control-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            color: #333;
+            font-weight: bold;
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+        
+        input[type="range"] {
+            width: 100%;
+            height: 8px;
+            border-radius: 4px;
+            background: #ddd;
+            outline: none;
+            -webkit-appearance: none;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #667eea;
+            cursor: pointer;
+            box-shadow: 0 2px 10px rgba(102, 126, 234, 0.5);
+        }
+        
+        .value-display {
+            color: #667eea;
+            font-weight: bold;
+            font-size: 12px;
+        }
+        
+        #info {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(10px);
+            max-width: 350px;
+            font-size: 14px;
+            z-index: 100;
+            transition: all 0.3s ease;
+        }
+        
+        .info-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            cursor: pointer;
+            user-select: none;
+        }
+        
+        .toggle-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.3s ease;
+        }
+        
+        .toggle-btn:hover {
+            background: #5a67d8;
+        }
+        
+        .toggle-btn.collapsed {
+            transform: rotate(180deg);
+        }
+        
+        .info-content {
+            max-height: 300px;
+            overflow: hidden;
+            transition: max-height 0.3s ease, opacity 0.3s ease;
+        }
+        
+        .info-content.collapsed {
+            max-height: 0;
+            opacity: 0;
+        }
+        
+        .equation {
+            background: #f0f4f8;
+            padding: 10px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+            text-align: center;
+            border-left: 4px solid #667eea;
+        }
+        
+        .highlight {
+            color: #667eea;
+            font-weight: bold;
+        }
+        
+        .drag-hint {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px 15px;
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(10px);
+            font-size: 12px;
+            color: #667eea;
+            z-index: 100;
+        }
+        
+        .wind-arrow {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 50;
+        }
+            position: absolute;
+            top: 50%;
+            right: 20px;
+            transform: translateY(-50%);
+            background: rgba(255, 255, 255, 0.9);
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(10px);
+            z-index: 100;
+        }
+        
+        #canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <canvas id="canvas"></canvas>
+        
+        <div id="controls">
+            <h3 style="margin-top: 0; color: #333;">伯努利原理控制台</h3>
+            
+            <div class="control-group">
+                <label for="windSpeed">風速 (m/s)</label>
+                <input type="range" id="windSpeed" min="0" max="50" value="20">
+                <div class="value-display">當前: <span id="windSpeedValue">20</span> m/s</div>
+            </div>
+            
+            <div class="control-group">
+                <label for="ballSize">球體大小</label>
+                <input type="range" id="ballSize" min="0.5" max="3" step="0.1" value="1">
+                <div class="value-display">半徑: <span id="ballSizeValue">1.0</span></div>
+            </div>
+            
+            <div class="control-group">
+                <label for="ballMass">球體質量</label>
+                <input type="range" id="ballMass" min="0.1" max="2" step="0.1" value="0.5">
+                <div class="value-display">質量: <span id="ballMassValue">0.5</span> kg</div>
+            </div>
+            
+            <div class="control-group">
+                <label for="windDirection">風向角度</label>
+                <input type="range" id="windDirection" min="0" max="360" value="0">
+                <div class="value-display">角度: <span id="windDirectionValue">0</span>°</div>
+            </div>
+            
+            <div class="control-group">
+                <label for="windVertical">垂直風力</label>
+                <input type="range" id="windVertical" min="-20" max="20" value="0">
+                <div class="value-display">垂直: <span id="windVerticalValue">0</span> m/s</div>
+            </div>
+        </div>
+        
+        <div class="drag-hint">
+            🖱️ 拖拽球體移動位置<br>
+            🌪️ 調整風向體驗不同效果
+        </div>
+        
+        <div class="pressure-indicator">
+            <h4 style="margin-top: 0;">壓力差測量</h4>
+            <div>上方壓力: <span class="highlight" id="topPressure">101.3</span> kPa</div>
+            <div>下方壓力: <span class="highlight" id="bottomPressure">101.3</span> kPa</div>
+            <div>壓力差: <span class="highlight" id="pressureDiff">0.0</span> kPa</div>
+            <div>升力: <span class="highlight" id="liftForce">0.0</span> N</div>
+        </div>
+        
+        <div id="info">
+            <div class="info-header" id="infoHeader">
+                <h4 style="margin: 0;">伯努利原理</h4>
+                <button class="toggle-btn" id="toggleBtn">▼</button>
+            </div>
+            <div class="info-content" id="infoContent">
+                <p>當空氣流過球體時，上方流速較快，下方流速較慢</p>
+                <div class="equation">
+                    P + ½ρv² + ρgh = 常數
+                </div>
+                <p><strong>原理：</strong>流速越快，壓力越小。上下壓力差產生升力！</p>
+                <p><strong>公式說明：</strong></p>
+                <ul style="margin: 5px 0; padding-left: 20px; font-size: 12px;">
+                    <li><strong>P</strong> = 流體壓力</li>
+                    <li><strong>ρ</strong> = 流體密度 (空氣: 1.225 kg/m³)</li>
+                    <li><strong>v</strong> = 流體速度</li>
+                    <li><strong>g</strong> = 重力加速度 (9.81 m/s²)</li>
+                    <li><strong>h</strong> = 高度</li>
+                </ul>
+                <p><strong>操作：</strong>調整風速觀察球體的浮力變化</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // 折疊功能
+        function toggleInfo() {
+            const content = document.getElementById('infoContent');
+            const btn = document.getElementById('toggleBtn');
+            
+            if (content.classList.contains('collapsed')) {
+                content.classList.remove('collapsed');
+                btn.classList.remove('collapsed');
+                btn.textContent = '▼';
+            } else {
+                content.classList.add('collapsed');
+                btn.classList.add('collapsed');
+                btn.textContent = '▲';
+            }
+        }
+        
+        // 事件監聽器
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('infoHeader').addEventListener('click', toggleInfo);
+        });
+        
+        // 場景設置
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('canvas'), antialias: true });
+        
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setClearColor(0x87CEEB, 1);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        
+        // 光照
+        const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+        scene.add(ambientLight);
+        
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+        directionalLight.position.set(10, 10, 5);
+        directionalLight.castShadow = true;
+        directionalLight.shadow.mapSize.width = 2048;
+        directionalLight.shadow.mapSize.height = 2048;
+        scene.add(directionalLight);
+        
+        // 球體（演示對象）
+        let ballGeometry = new THREE.SphereGeometry(1, 32, 32);
+        const ballMaterial = new THREE.MeshPhongMaterial({ 
+            color: 0xff6b6b,
+            shininess: 100,
+            transparent: true,
+            opacity: 0.9
+        });
+        const ball = new THREE.Mesh(ballGeometry, ballMaterial);
+        ball.position.set(0, 0, 0);
+        ball.castShadow = true;
+        scene.add(ball);
+        
+        // 風場可視化粒子
+        const particleCount = 1000;
+        const particles = new THREE.BufferGeometry();
+        const positions = new Float32Array(particleCount * 3);
+        const velocities = new Float32Array(particleCount * 3);
+        
+        for (let i = 0; i < particleCount; i++) {
+            positions[i * 3] = (Math.random() - 0.5) * 30 - 15;
+            positions[i * 3 + 1] = (Math.random() - 0.5) * 20;
+            positions[i * 3 + 2] = (Math.random() - 0.5) * 10;
+            
+            velocities[i * 3] = 0;
+            velocities[i * 3 + 1] = 0;
+            velocities[i * 3 + 2] = 0;
+        }
+        
+        particles.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        const particleMaterial = new THREE.PointsMaterial({
+            color: 0xffffff,
+            size: 0.1,
+            transparent: true,
+            opacity: 0.7
+        });
+        const particleSystem = new THREE.Points(particles, particleMaterial);
+        scene.add(particleSystem);
+        
+        // 地面
+        const groundGeometry = new THREE.PlaneGeometry(50, 30);
+        const groundMaterial = new THREE.MeshLambertMaterial({ 
+            color: 0x90EE90,
+            transparent: true,
+            opacity: 0.8
+        });
+        const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+        ground.rotation.x = -Math.PI / 2;
+        ground.position.y = -8;
+        ground.receiveShadow = true;
+        scene.add(ground);
+        
+        // 控制變數
+        let windSpeed = 20;
+        let windDirection = 0; // 度數
+        let windVertical = 0;  // 垂直風速
+        let ballRadius = 1;
+        let ballMass = 0.5;
+        let ballVelocityY = 0;
+        let ballVelocityX = 0;
+        let ballVelocityZ = 0;
+        let gravity = -9.81;
+        
+        // 拖拽相關變數
+        let isDragging = false;
+        let mouse = new THREE.Vector2();
+        let raycaster = new THREE.Raycaster();
+        let dragPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+        
+        // 物理常數
+        const airDensity = 1.225; // kg/m³
+        const atmosphericPressure = 101325; // Pa
+        
+        // 控制事件
+        const windSpeedSlider = document.getElementById('windSpeed');
+        const windDirectionSlider = document.getElementById('windDirection');
+        const windVerticalSlider = document.getElementById('windVertical');
+        const ballSizeSlider = document.getElementById('ballSize');
+        const ballMassSlider = document.getElementById('ballMass');
+        
+        windSpeedSlider.addEventListener('input', (e) => {
+            windSpeed = parseFloat(e.target.value);
+            document.getElementById('windSpeedValue').textContent = windSpeed;
+        });
+        
+        windDirectionSlider.addEventListener('input', (e) => {
+            windDirection = parseFloat(e.target.value);
+            document.getElementById('windDirectionValue').textContent = windDirection;
+        });
+        
+        windVerticalSlider.addEventListener('input', (e) => {
+            windVertical = parseFloat(e.target.value);
+            document.getElementById('windVerticalValue').textContent = windVertical;
+        });
+        
+        ballSizeSlider.addEventListener('input', (e) => {
+            ballRadius = parseFloat(e.target.value);
+            document.getElementById('ballSizeValue').textContent = ballRadius.toFixed(1);
+            
+            // 更新球體幾何
+            scene.remove(ball);
+            ballGeometry.dispose();
+            ballGeometry = new THREE.SphereGeometry(ballRadius, 32, 32);
+            const newBall = new THREE.Mesh(ballGeometry, ballMaterial);
+            newBall.position.copy(ball.position);
+            newBall.castShadow = true;
+            scene.add(newBall);
+            ball.geometry = ballGeometry;
+            ball.copy(newBall);
+            scene.remove(newBall);
+            scene.add(ball);
+        });
+        
+        ballMassSlider.addEventListener('input', (e) => {
+            ballMass = parseFloat(e.target.value);
+            document.getElementById('ballMassValue').textContent = ballMass.toFixed(1);
+        });
+        
+        // 滑鼠事件處理
+        function onMouseDown(event) {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObject(ball);
+            
+            if (intersects.length > 0) {
+                isDragging = true;
+                renderer.domElement.style.cursor = 'grabbing';
+            }
+        }
+        
+        function onMouseMove(event) {
+            if (!isDragging) return;
+            
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            
+            raycaster.setFromCamera(mouse, camera);
+            
+            const intersectPoint = new THREE.Vector3();
+            raycaster.ray.intersectPlane(dragPlane, intersectPoint);
+            
+            // 限制拖拽範圍
+            intersectPoint.x = Math.max(-10, Math.min(10, intersectPoint.x));
+            intersectPoint.y = Math.max(-6, Math.min(6, intersectPoint.y));
+            intersectPoint.z = Math.max(-5, Math.min(5, intersectPoint.z));
+            
+            ball.position.copy(intersectPoint);
+            
+            // 重置速度
+            ballVelocityX = 0;
+            ballVelocityY = 0;
+            ballVelocityZ = 0;
+        }
+        
+        function onMouseUp(event) {
+            isDragging = false;
+            renderer.domElement.style.cursor = 'default';
+        }
+        
+        // 添加滑鼠事件監聽器
+        renderer.domElement.addEventListener('mousedown', onMouseDown);
+        renderer.domElement.addEventListener('mousemove', onMouseMove);
+        renderer.domElement.addEventListener('mouseup', onMouseUp);
+        
+        // 計算伯努利效應
+        function calculateBernoulliEffect() {
+            // 將風向轉換為向量
+            const windRad = (windDirection * Math.PI) / 180;
+            const windX = windSpeed * Math.cos(windRad);
+            const windZ = windSpeed * Math.sin(windRad);
+            const windY = windVertical;
+            
+            // 計算相對於球體的風速
+            const relativeWindSpeed = Math.sqrt(windX * windX + windY * windY + windZ * windZ);
+            
+            // 球體周圍的流速分布（簡化模型）
+            const topVelocity = relativeWindSpeed * 1.5; // 上方流速較快
+            const bottomVelocity = relativeWindSpeed * 0.7; // 下方流速較慢
+            
+            // 根據伯努利方程計算壓力
+            const topPressure = atmosphericPressure - 0.5 * airDensity * topVelocity * topVelocity;
+            const bottomPressure = atmosphericPressure - 0.5 * airDensity * bottomVelocity * bottomVelocity;
+            
+            const pressureDifference = bottomPressure - topPressure;
+            const ballArea = Math.PI * ballRadius * ballRadius;
+            const liftForce = pressureDifference * ballArea / 1000; // 轉換為N
+            
+            // 計算側向力（基於風向）
+            const sideForce = windX * airDensity * ballArea * 0.1;
+            const frontForce = windZ * airDensity * ballArea * 0.1;
+            
+            // 更新顯示
+            document.getElementById('topPressure').textContent = (topPressure / 1000).toFixed(1);
+            document.getElementById('bottomPressure').textContent = (bottomPressure / 1000).toFixed(1);
+            document.getElementById('pressureDiff').textContent = (pressureDifference / 1000).toFixed(2);
+            document.getElementById('liftForce').textContent = liftForce.toFixed(2);
+            
+            return { lift: liftForce, side: sideForce, front: frontForce };
+        }
+        
+        // 更新粒子模擬風場
+        function updateParticles() {
+            const positions = particleSystem.geometry.attributes.position.array;
+            
+            // 風向向量
+            const windRad = (windDirection * Math.PI) / 180;
+            const windVecX = Math.cos(windRad);
+            const windVecZ = Math.sin(windRad);
+            
+            for (let i = 0; i < particleCount; i++) {
+                const idx = i * 3;
+                let x = positions[idx];
+                let y = positions[idx + 1];
+                let z = positions[idx + 2];
+                
+                // 計算到球體的距離
+                const dx = x - ball.position.x;
+                const dy = y - ball.position.y;
+                const dz = z - ball.position.z;
+                const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                
+                // 風場流動
+                if (distance > ballRadius + 0.5) {
+                    // 遠離球體的粒子按風向流動
+                    x += windVecX * windSpeed * 0.02;
+                    z += windVecZ * windSpeed * 0.02;
+                    y += windVertical * 0.02;
+                    
+                    // 球體周圍的流線彎曲
+                    if (distance < ballRadius + 3) {
+                        const influence = (ballRadius + 3 - distance) / 3;
+                        y += (dy > 0 ? 1 : -1) * influence * windSpeed * 0.01;
+                    }
+                } else {
+                    // 繞過球體
+                    const angle = Math.atan2(dy, dx);
+                    x += Math.cos(angle + Math.PI/2) * windSpeed * 0.02;
+                    y += Math.sin(angle + Math.PI/2) * windSpeed * 0.02;
+                }
+                
+                // 重置超出邊界的粒子
+                if (Math.abs(x) > 15 || Math.abs(z) > 15) {
+                    // 根據風向重新生成粒子
+                    if (windVecX > 0) x = -15;
+                    else if (windVecX < 0) x = 15;
+                    else x = (Math.random() - 0.5) * 30;
+                    
+                    if (windVecZ > 0) z = -15;
+                    else if (windVecZ < 0) z = 15;
+                    else z = (Math.random() - 0.5) * 30;
+                    
+                    y = (Math.random() - 0.5) * 20;
+                }
+                
+                positions[idx] = x;
+                positions[idx + 1] = y;
+                positions[idx + 2] = z;
+            }
+            
+            particleSystem.geometry.attributes.position.needsUpdate = true;
+        }
+        
+        // 球體物理更新
+        function updateBallPhysics() {
+            if (isDragging) return; // 拖拽時不計算物理
+            
+            const forces = calculateBernoulliEffect();
+            const weight = ballMass * Math.abs(gravity);
+            
+            // 計算各方向的淨力和加速度
+            const netForceY = forces.lift - weight;
+            const netForceX = forces.side;
+            const netForceZ = forces.front;
+            
+            const accelerationY = netForceY / ballMass;
+            const accelerationX = netForceX / ballMass;
+            const accelerationZ = netForceZ / ballMass;
+            
+            // 更新速度和位置
+            ballVelocityY += accelerationY * 0.016; // 假設60fps
+            ballVelocityX += accelerationX * 0.016;
+            ballVelocityZ += accelerationZ * 0.016;
+            
+            ball.position.y += ballVelocityY * 0.016;
+            ball.position.x += ballVelocityX * 0.016;
+            ball.position.z += ballVelocityZ * 0.016;
+            
+            // 添加阻尼
+            ballVelocityY *= 0.98;
+            ballVelocityX *= 0.98;
+            ballVelocityZ *= 0.98;
+            
+            // 邊界限制
+            if (ball.position.y < -7 + ballRadius) {
+                ball.position.y = -7 + ballRadius;
+                ballVelocityY = 0;
+            }
+            if (ball.position.y > 8) {
+                ball.position.y = 8;
+                ballVelocityY = 0;
+            }
+            
+            // X軸邊界
+            if (Math.abs(ball.position.x) > 10) {
+                ball.position.x = ball.position.x > 0 ? 10 : -10;
+                ballVelocityX = 0;
+            }
+            
+            // Z軸邊界
+            if (Math.abs(ball.position.z) > 8) {
+                ball.position.z = ball.position.z > 0 ? 8 : -8;
+                ballVelocityZ = 0;
+            }
+            
+            // 球體顏色變化表示升力
+            if (forces.lift > weight) {
+                ball.material.color.setHex(0x00ff00); // 綠色表示上升
+            } else if (forces.lift > 0) {
+                ball.material.color.setHex(0xffff00); // 黃色表示平衡
+            } else {
+                ball.material.color.setHex(0xff6b6b); // 紅色表示下降
+            }
+        }
+        
+        // 相機設置
+        camera.position.set(8, 2, 8);
+        camera.lookAt(0, 0, 0);
+        
+        // 動畫循環
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            updateParticles();
+            updateBallPhysics();
+            
+            // 球體旋轉
+            ball.rotation.x += 0.01;
+            ball.rotation.z += 0.005;
+            
+            renderer.render(scene, camera);
+        }
+        
+        // 響應式設計
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+        
+        // 初始化
+        animate();
+    </script>
+</body>
+</html>
