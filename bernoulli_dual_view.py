@@ -12,6 +12,10 @@ HEIGHT = 800
 FPS = 60
 VIEW_WIDTH = 400  # Width for 3D visualization
 
+# Base dimensions for scaling
+BASE_WIDTH = 1400
+BASE_HEIGHT = 800
+
 # Colors
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
@@ -113,6 +117,11 @@ class BernoulliSimulation:
         pygame.display.set_caption("伯努利原理科學模擬 - 雙平面視圖")
         self.clock = pygame.time.Clock()
         
+        # Scaling factors for responsive design
+        self.scale_x = self.current_width / BASE_WIDTH
+        self.scale_y = self.current_height / BASE_HEIGHT
+        self.global_scale = min(self.scale_x, self.scale_y)
+        
         # Layout calculations
         self.middle_section_width = int(self.current_width * 0.25)
         self.current_view_width = (self.current_width - self.middle_section_width) // 2
@@ -151,8 +160,8 @@ class BernoulliSimulation:
             z = random.uniform(-200, 200)
             self.particles.append(Particle(x, y, z))
         
-        # UI
-        base_font_size = max(12, int(self.current_height / 50))
+        # UI with scaling
+        base_font_size = max(12, int(self.current_height / 50 * self.global_scale))
         preferred_fonts = ['Noto Sans TC', 'Microsoft JhengHei', 'Segoe UI', 'Arial']
         self.font = pygame.font.SysFont(preferred_fonts, base_font_size)
         self.title_font = pygame.font.SysFont(preferred_fonts, int(base_font_size * 1.5), bold=True)
@@ -374,20 +383,20 @@ class BernoulliSimulation:
                 alpha = int(particle.life * 0.8)
                 color = (*particle.color, alpha)
                 
-                # XY view (left panel)
-                screen_x = int(particle.x + self.current_view_width // 2)
-                screen_y = int(particle.y + self.current_height // 2)
+                # XY view (left panel) - apply scaling
+                screen_x = int((particle.x + BASE_WIDTH // 4) * self.scale_x)
+                screen_y = int((particle.y + BASE_HEIGHT // 2) * self.scale_y)
                 
                 if 0 <= screen_x < self.current_view_width and 0 <= screen_y < self.current_height:
-                    size = max(1, int(particle.size))
+                    size = max(1, int(particle.size * self.global_scale))
                     pygame.draw.circle(self.particle_surface_xy, particle.color, (screen_x, screen_y), size)
                 
-                # ZX view (right panel) - X horizontal, Z vertical
-                screen_x_zx = int(particle.x + self.current_view_width // 2)
-                screen_y_zx = int(self.current_height // 2 - particle.z)
+                # ZX view (right panel) - X horizontal, Z vertical with scaling
+                screen_x_zx = int((particle.x + BASE_WIDTH // 4) * self.scale_x)
+                screen_y_zx = int((BASE_HEIGHT // 2 - particle.z) * self.scale_y)
                 
                 if 0 <= screen_x_zx < self.current_view_width and 0 <= screen_y_zx < self.current_height:
-                    size = max(1, int(particle.size))
+                    size = max(1, int(particle.size * self.global_scale))
                     pygame.draw.circle(self.particle_surface_xz, particle.color, (screen_x_zx, screen_y_zx), size)
         
         # Blit particle surfaces to main screen
@@ -399,33 +408,35 @@ class BernoulliSimulation:
         ball_color = self.get_ball_color()
         
         # XY view (left panel) - shows X and Y coordinates
-        ball_x_xy = int(self.ball_pos[0])
-        ball_y_xy = int(self.ball_pos[1])
+        ball_x_xy = int(self.ball_pos[0] * self.scale_x)
+        ball_y_xy = int(self.ball_pos[1] * self.scale_y)
         
-        # Use consistent radius for both views
-        display_radius_xy = int(self.ball_radius)
+        # Use scaled radius
+        display_radius_xy = int(self.ball_radius * self.global_scale)
         
-        # Draw shadow
-        shadow_offset = 3
+        # Draw shadow with scaled offset
+        shadow_offset = int(3 * self.global_scale)
         pygame.draw.circle(self.screen, (50, 50, 50), 
                          (ball_x_xy + shadow_offset, ball_y_xy + shadow_offset), 
                          display_radius_xy)
         
         # Draw ball
         pygame.draw.circle(self.screen, ball_color, (ball_x_xy, ball_y_xy), display_radius_xy)
-        pygame.draw.circle(self.screen, BLACK, (ball_x_xy, ball_y_xy), display_radius_xy, 2)
+        pygame.draw.circle(self.screen, BLACK, (ball_x_xy, ball_y_xy), display_radius_xy, 
+                         max(1, int(2 * self.global_scale)))
         
         # Add highlight
         highlight_x = ball_x_xy - display_radius_xy // 3
         highlight_y = ball_y_xy - display_radius_xy // 3
-        pygame.draw.circle(self.screen, WHITE, (highlight_x, highlight_y), display_radius_xy // 4)
+        pygame.draw.circle(self.screen, WHITE, (highlight_x, highlight_y), 
+                         max(1, display_radius_xy // 4))
         
         # ZX view (right panel) - shows X and Z coordinates (X horizontal, Z vertical)
-        ball_x_zx = int(self.ball_pos[0]) + self.current_view_width + self.middle_section_width
-        ball_y_zx = int(self.current_height // 2 - self.ball_pos[2])
+        ball_x_zx = int(self.ball_pos[0] * self.scale_x) + self.current_view_width + self.middle_section_width
+        ball_y_zx = int((self.current_height // 2 - self.ball_pos[2]) * self.scale_y)
         
-        # Use consistent radius for both views
-        display_radius_zx = int(self.ball_radius)
+        # Use scaled radius
+        display_radius_zx = int(self.ball_radius * self.global_scale)
         
         # Draw shadow
         pygame.draw.circle(self.screen, (50, 50, 50), 
@@ -434,7 +445,8 @@ class BernoulliSimulation:
         
         # Draw ball
         pygame.draw.circle(self.screen, ball_color, (ball_x_zx, ball_y_zx), display_radius_zx)
-        pygame.draw.circle(self.screen, BLACK, (ball_x_zx, ball_y_zx), display_radius_zx, 2)
+        pygame.draw.circle(self.screen, BLACK, (ball_x_zx, ball_y_zx), display_radius_zx, 
+                         max(1, int(2 * self.global_scale)))
         
         # Add highlight
         highlight_x_zx = ball_x_zx - display_radius_zx // 3
@@ -443,13 +455,14 @@ class BernoulliSimulation:
     
     def draw_ui(self):
         """Draw the complete UI with dual views and controls"""
-        # Draw view separators
+        # Draw view separators with scaling
+        line_width = max(1, int(3 * self.global_scale))
         pygame.draw.line(self.screen, BLACK, 
                         (self.current_view_width, 0), 
-                        (self.current_view_width, self.current_height), 3)
+                        (self.current_view_width, self.current_height), line_width)
         pygame.draw.line(self.screen, BLACK, 
                         (self.current_view_width + self.middle_section_width, 0), 
-                        (self.current_view_width + self.middle_section_width, self.current_height), 3)
+                        (self.current_view_width + self.middle_section_width, self.current_height), line_width)
         
         # View labels
         xy_label = self.title_font.render("XY 平面視圖", True, BLACK)
@@ -484,63 +497,70 @@ class BernoulliSimulation:
         
         # Scale for display
         scale = 3
-        arrow_x = wind_x * scale
-        arrow_z = wind_z * scale
-        arrow_y = self.wind_vertical * scale
+        arrow_x = wind_x * scale * self.global_scale
+        arrow_z = wind_z * scale * self.global_scale
+        arrow_y = self.wind_vertical * scale * self.global_scale
         
         # XY view wind vector (left panel)
-        center_xy = (self.current_view_width // 2, self.current_height // 2)
+        center_xy = (int(self.current_view_width // 2), int(self.current_height // 2))
         
         # Horizontal wind component (X direction)
-        if abs(arrow_x) > 5:
-            end_x = center_xy[0] + arrow_x
-            pygame.draw.line(self.screen, RED, center_xy, (end_x, center_xy[1]), 4)
+        if abs(arrow_x) > 5 * self.global_scale:
+            end_x = int(center_xy[0] + arrow_x)
+            line_width = max(1, int(4 * self.global_scale))
+            pygame.draw.line(self.screen, RED, center_xy, (end_x, center_xy[1]), line_width)
             # Arrow head
             self.draw_arrow_head((end_x, center_xy[1]), arrow_x > 0, RED, horizontal=True)
             # Wind speed label
             wind_label = self.font.render(f"風速X: {wind_x:.1f} m/s", True, RED)
-            self.screen.blit(wind_label, (center_xy[0] + 10, center_xy[1] - 40))
+            label_offset = int(10 * self.global_scale)
+            self.screen.blit(wind_label, (center_xy[0] + label_offset, center_xy[1] - int(40 * self.global_scale)))
         
         # Vertical wind component (Y direction)
-        if abs(arrow_y) > 5:
-            end_y = center_xy[1] - arrow_y  # Negative because screen Y is inverted
-            pygame.draw.line(self.screen, GREEN, center_xy, (center_xy[0], end_y), 4)
+        if abs(arrow_y) > 5 * self.global_scale:
+            end_y = int(center_xy[1] - arrow_y)  # Negative because screen Y is inverted
+            line_width = max(1, int(4 * self.global_scale))
+            pygame.draw.line(self.screen, GREEN, center_xy, (center_xy[0], end_y), line_width)
             # Arrow head
             self.draw_arrow_head((center_xy[0], end_y), arrow_y > 0, GREEN, horizontal=False)
             # Wind speed label
             wind_label = self.font.render(f"風速Y: {self.wind_vertical:.1f} m/s", True, GREEN)
-            self.screen.blit(wind_label, (center_xy[0] + 10, center_xy[1] - 20))
+            label_offset = int(10 * self.global_scale)
+            self.screen.blit(wind_label, (center_xy[0] + label_offset, center_xy[1] - int(20 * self.global_scale)))
         
         # XZ view wind vector (right panel)
-        center_xz = (self.current_view_width + self.middle_section_width + self.current_view_width // 2, 
-                     self.current_height // 2)
+        center_xz = (int(self.current_view_width + self.middle_section_width + self.current_view_width // 2), 
+                     int(self.current_height // 2))
         
         # X direction (horizontal in XZ view)
-        if abs(arrow_x) > 5:
-            end_x_xz = center_xz[0] + arrow_x
-            pygame.draw.line(self.screen, RED, center_xz, (end_x_xz, center_xz[1]), 4)
+        if abs(arrow_x) > 5 * self.global_scale:
+            end_x_xz = int(center_xz[0] + arrow_x)
+            line_width = max(1, int(4 * self.global_scale))
+            pygame.draw.line(self.screen, RED, center_xz, (end_x_xz, center_xz[1]), line_width)
             # Arrow head
             self.draw_arrow_head((end_x_xz, center_xz[1]), arrow_x > 0, RED, horizontal=True)
         
         # Z direction (vertical in XZ view)
-        if abs(arrow_z) > 5:
-            end_z_xz = center_xz[1] - arrow_z  # Negative because screen Y is inverted
-            pygame.draw.line(self.screen, BLUE, center_xz, (center_xz[0], end_z_xz), 4)
+        if abs(arrow_z) > 5 * self.global_scale:
+            end_z_xz = int(center_xz[1] - arrow_z)  # Negative because screen Y is inverted
+            line_width = max(1, int(4 * self.global_scale))
+            pygame.draw.line(self.screen, BLUE, center_xz, (center_xz[0], end_z_xz), line_width)
             # Arrow head
             self.draw_arrow_head((center_xz[0], end_z_xz), arrow_z > 0, BLUE, horizontal=False)
             # Wind speed label
             wind_label = self.font.render(f"風速Z: {wind_z:.1f} m/s", True, BLUE)
-            self.screen.blit(wind_label, (center_xz[0] + 10, center_xz[1] - 20))
+            label_offset = int(10 * self.global_scale)
+            self.screen.blit(wind_label, (center_xz[0] + label_offset, center_xz[1] - int(20 * self.global_scale)))
         
         # Total wind speed display
         total_wind = math.sqrt(wind_x**2 + wind_z**2 + self.wind_vertical**2)
         total_label = self.font.render(f"總風速: {total_wind:.1f} m/s", True, BLACK)
-        self.screen.blit(total_label, (10, self.current_height - 30))
+        self.screen.blit(total_label, (int(10 * self.global_scale), self.current_height - int(30 * self.global_scale)))
     
     def draw_arrow_head(self, pos, pointing_right_or_up, color, horizontal=True):
         """Draw arrow head at the end of wind vector"""
         x, y = pos
-        size = 8
+        size = max(4, int(8 * self.global_scale))
         
         if horizontal:
             if pointing_right_or_up:  # Pointing right
@@ -556,70 +576,75 @@ class BernoulliSimulation:
         pygame.draw.polygon(self.screen, color, points)
     def draw_boundaries(self):
         """Draw ground and ceiling boundaries"""
-        ground_y = self.current_height - 50
-        ceiling_y = 50
+        ground_y = int(self.current_height - 50 * self.scale_y)
+        ceiling_y = int(50 * self.scale_y)
         
-        # Draw ground line on both views
-        pygame.draw.line(self.screen, (139, 69, 19), (0, ground_y), (self.current_view_width, ground_y), 3)
+        # Draw ground line on both views with scaling
+        line_width = max(1, int(3 * self.global_scale))
+        pygame.draw.line(self.screen, (139, 69, 19), (0, ground_y), (self.current_view_width, ground_y), line_width)
         pygame.draw.line(self.screen, (139, 69, 19), 
                         (self.current_view_width + self.middle_section_width, ground_y), 
-                        (self.current_width, ground_y), 3)
+                        (self.current_width, ground_y), line_width)
         
-        # Draw ceiling line on both views
-        pygame.draw.line(self.screen, GRAY, (0, ceiling_y), (self.current_view_width, ceiling_y), 2)
+        # Draw ceiling line on both views with scaling
+        ceiling_line_width = max(1, int(2 * self.global_scale))
+        pygame.draw.line(self.screen, GRAY, (0, ceiling_y), (self.current_view_width, ceiling_y), ceiling_line_width)
         pygame.draw.line(self.screen, GRAY, 
                         (self.current_view_width + self.middle_section_width, ceiling_y), 
-                        (self.current_width, ceiling_y), 2)
+                        (self.current_width, ceiling_y), ceiling_line_width)
         
-        # Z方向地面線 (在XZ視圖中顯示)
-        z_ground_y = self.current_height // 2 + self.current_height // 4
+        # Z方向地面線 (在XZ視圖中顯示) with scaling
+        z_ground_y = int((self.current_height // 2 + self.current_height // 4) * self.scale_y)
         pygame.draw.line(self.screen, (139, 69, 19), 
                         (self.current_view_width + self.middle_section_width, z_ground_y), 
-                        (self.current_width, z_ground_y), 3)
+                        (self.current_width, z_ground_y), line_width)
         
-        # Ground labels
+        # Ground labels with scaling
         ground_label = self.font.render("地面", True, (139, 69, 19))
-        self.screen.blit(ground_label, (10, ground_y + 5))
-        self.screen.blit(ground_label, (self.current_view_width + self.middle_section_width + 10, ground_y + 5))
+        label_offset = int(10 * self.global_scale)
+        self.screen.blit(ground_label, (label_offset, ground_y + int(5 * self.global_scale)))
+        self.screen.blit(ground_label, (self.current_view_width + self.middle_section_width + label_offset, ground_y + int(5 * self.global_scale)))
         
         # Z方向地面標籤
         z_ground_label = self.font.render("Z地面", True, (139, 69, 19))
-        self.screen.blit(z_ground_label, (self.current_view_width + self.middle_section_width + 10, z_ground_y + 5))
+        self.screen.blit(z_ground_label, (self.current_view_width + self.middle_section_width + label_offset, z_ground_y + int(5 * self.global_scale)))
     
     def draw_axes(self):
         """Draw coordinate axes on both views"""
-        axes_length = 50
+        axes_length = int(50 * self.global_scale)
         axes_color = DARK_BLUE
         
-        # XY view axes (bottom-left corner)
-        origin_xy = (30, self.current_height - 80)
+        # XY view axes (bottom-left corner) with scaling
+        origin_xy = (int(30 * self.global_scale), int(self.current_height - 80 * self.scale_y))
         
-        # X axis (horizontal, red)
+        # X axis (horizontal, red) with scaling
+        line_width = max(1, int(3 * self.global_scale))
         pygame.draw.line(self.screen, RED, origin_xy, 
-                        (origin_xy[0] + axes_length, origin_xy[1]), 3)
+                        (origin_xy[0] + axes_length, origin_xy[1]), line_width)
         x_label = self.font.render("X", True, RED)
-        self.screen.blit(x_label, (origin_xy[0] + axes_length + 5, origin_xy[1] - 10))
+        label_offset = int(5 * self.global_scale)
+        self.screen.blit(x_label, (origin_xy[0] + axes_length + label_offset, origin_xy[1] - int(10 * self.global_scale)))
         
         # Y axis (vertical, green)
         pygame.draw.line(self.screen, GREEN, origin_xy, 
-                        (origin_xy[0], origin_xy[1] - axes_length), 3)
+                        (origin_xy[0], origin_xy[1] - axes_length), line_width)
         y_label = self.font.render("Y", True, GREEN)
-        self.screen.blit(y_label, (origin_xy[0] - 15, origin_xy[1] - axes_length - 5))
+        self.screen.blit(y_label, (origin_xy[0] - int(15 * self.global_scale), origin_xy[1] - axes_length - label_offset))
         
         # ZX view axes (bottom-left corner of right panel) - X horizontal, Z vertical
-        origin_zx = (self.current_view_width + self.middle_section_width + 30, self.current_height - 80)
+        origin_zx = (int(self.current_view_width + self.middle_section_width + 30 * self.global_scale), int(self.current_height - 80 * self.scale_y))
         
         # X axis (horizontal, red)
         pygame.draw.line(self.screen, RED, origin_zx, 
-                        (origin_zx[0] + axes_length, origin_zx[1]), 3)
+                        (origin_zx[0] + axes_length, origin_zx[1]), line_width)
         x_label_zx = self.font.render("X", True, RED)
-        self.screen.blit(x_label_zx, (origin_zx[0] + axes_length + 5, origin_zx[1] - 10))
+        self.screen.blit(x_label_zx, (origin_zx[0] + axes_length + label_offset, origin_zx[1] - int(10 * self.global_scale)))
         
         # Z axis (vertical, blue)
         pygame.draw.line(self.screen, BLUE, origin_zx, 
-                        (origin_zx[0], origin_zx[1] - axes_length), 3)
+                        (origin_zx[0], origin_zx[1] - axes_length), line_width)
         z_label = self.font.render("Z", True, BLUE)
-        self.screen.blit(z_label, (origin_zx[0] - 15, origin_zx[1] - axes_length - 5))
+        self.screen.blit(z_label, (origin_zx[0] - int(15 * self.global_scale), origin_zx[1] - axes_length - label_offset))
     
     def draw_control_panel(self):
         """Draw the control panel in the middle section"""
@@ -632,12 +657,12 @@ class BernoulliSimulation:
         title_rect = title.get_rect(center=(self.current_view_width + self.middle_section_width // 2, 30))
         self.screen.blit(title, title_rect)
         
-        # Draw sliders
+        # Draw sliders with scaling
         middle_x = self.current_view_width + self.middle_section_width // 2
-        slider_width = int(self.middle_section_width * 0.8)
-        y_offset = 70
-        slider_height = int(self.current_height * 0.12)
-        y_increment = int(self.current_height * 0.15)
+        slider_width = int(self.middle_section_width * 0.8 * self.scale_x)
+        y_offset = int(70 * self.scale_y)
+        slider_height = int(self.current_height * 0.12 * self.scale_y)
+        y_increment = int(self.current_height * 0.15 * self.scale_y)
         
         mouse_pos = pygame.mouse.get_pos()
         
@@ -648,14 +673,14 @@ class BernoulliSimulation:
     def draw_slider(self, key, slider, middle_x, slider_width, y_offset, mouse_pos):
         """Draw a horizontal slider"""
         slider_length = slider_width
-        slider_thickness = 8
+        slider_thickness = max(4, int(8 * self.global_scale))
         slider_x = middle_x - slider_length // 2
-        slider_y = y_offset + 20
+        slider_y = y_offset + int(20 * self.scale_y)
         
         # Slider track
         track_rect = pygame.Rect(slider_x, slider_y - slider_thickness // 2, 
                                slider_length, slider_thickness)
-        pygame.draw.rect(self.screen, GRAY, track_rect, border_radius=4)
+        pygame.draw.rect(self.screen, GRAY, track_rect, border_radius=max(1, int(4 * self.global_scale)))
         
         # Slider fill
         value_range = slider["max"] - slider["min"]
@@ -668,10 +693,10 @@ class BernoulliSimulation:
         if selected_length > 0:
             fill_rect = pygame.Rect(slider_x, slider_y - slider_thickness // 2, 
                                   selected_length, slider_thickness)
-            pygame.draw.rect(self.screen, BLUE, fill_rect, border_radius=4)
+            pygame.draw.rect(self.screen, BLUE, fill_rect, border_radius=max(1, int(4 * self.global_scale)))
         
         # Slider handle
-        handle_radius = 12
+        handle_radius = max(6, int(12 * self.global_scale))
         handle_center = (slider_x + selected_length, slider_y)
         
         # Check if mouse is hovering over handle
@@ -679,7 +704,7 @@ class BernoulliSimulation:
         handle_color = DARK_BLUE if hovering or self.active_slider == key else BLUE
         
         pygame.draw.circle(self.screen, handle_color, handle_center, handle_radius)
-        pygame.draw.circle(self.screen, BLACK, handle_center, handle_radius, 2)
+        pygame.draw.circle(self.screen, BLACK, handle_center, handle_radius, max(1, int(2 * self.global_scale)))
         
         # Slider label and value
         if key == "ball_radius":
@@ -718,7 +743,7 @@ class BernoulliSimulation:
         # Background
         info_rect = pygame.Rect(info_x, info_y, info_width, info_height)
         pygame.draw.rect(self.screen, WHITE, info_rect)
-        pygame.draw.rect(self.screen, BLACK, info_rect, 2)
+        pygame.draw.rect(self.screen, BLACK, info_rect, max(1, int(2 * self.global_scale)))
         
         # Title
         title = self.font.render("物理數據", True, BLACK)
@@ -754,8 +779,8 @@ class BernoulliSimulation:
         
         # Semi-transparent background
         inst_surface = pygame.Surface((inst_width, inst_height), pygame.SRCALPHA)
-        pygame.draw.rect(inst_surface, (255, 255, 255, 200), (0, 0, inst_width, inst_height), border_radius=10)
-        pygame.draw.rect(inst_surface, BLACK, (0, 0, inst_width, inst_height), 2, border_radius=10)
+        pygame.draw.rect(inst_surface, (255, 255, 255, 200), (0, 0, inst_width, inst_height), border_radius=max(5, int(10 * self.global_scale)))
+        pygame.draw.rect(inst_surface, BLACK, (0, 0, inst_width, inst_height), max(1, int(2 * self.global_scale)), border_radius=max(5, int(10 * self.global_scale)))
         self.screen.blit(inst_surface, (inst_x, inst_y))
         
         # Instructions text
@@ -780,16 +805,16 @@ class BernoulliSimulation:
             return False
         
         middle_x = self.current_view_width + self.middle_section_width // 2
-        slider_width = int(self.middle_section_width * 0.8)
-        y_offset = 70
-        y_increment = int(self.current_height * 0.15)
+        slider_width = int(self.middle_section_width * 0.8 * self.scale_x)
+        y_offset = int(70 * self.scale_y)
+        y_increment = int(self.current_height * 0.15 * self.scale_y)
         
         for key in self.sliders:
             slider_rect = pygame.Rect(
                 middle_x - slider_width // 2,
-                y_offset + 10,
+                y_offset + int(10 * self.scale_y),
                 slider_width,
-                30
+                int(30 * self.scale_y)
             )
             
             if slider_rect.collidepoint(pos):
@@ -804,7 +829,7 @@ class BernoulliSimulation:
     def update_slider_value(self, key, mouse_x):
         """Update slider value based on mouse position"""
         middle_x = self.current_view_width + self.middle_section_width // 2
-        slider_width = int(self.middle_section_width * 0.8)
+        slider_width = int(self.middle_section_width * 0.8 * self.scale_x)
         slider_x = middle_x - slider_width // 2
         
         # Calculate position ratio
@@ -834,26 +859,32 @@ class BernoulliSimulation:
     def handle_ball_interaction(self, pos, event_type):
         """Handle ball dragging in both views"""
         if event_type == "down":
-            # Check XY view (left panel)
+            # Check XY view (left panel) - convert screen coordinates to scaled coordinates
             if pos[0] < self.current_view_width:
-                ball_distance = math.sqrt((pos[0] - self.ball_pos[0])**2 + 
-                                        (pos[1] - self.ball_pos[1])**2)
-                if ball_distance <= self.ball_radius:
+                # Convert screen position to ball coordinate space
+                ball_screen_x = int(self.ball_pos[0] * self.scale_x)
+                ball_screen_y = int(self.ball_pos[1] * self.scale_y)
+                scaled_radius = int(self.ball_radius * self.global_scale)
+                
+                ball_distance = math.sqrt((pos[0] - ball_screen_x)**2 + 
+                                        (pos[1] - ball_screen_y)**2)
+                if ball_distance <= scaled_radius:
                     self.dragging = True
                     self.active_view = "xy"
-                    self.drag_offset = [pos[0] - self.ball_pos[0], pos[1] - self.ball_pos[1]]
+                    self.drag_offset = [pos[0] - ball_screen_x, pos[1] - ball_screen_y]
                     self.ball_velocity = [0, 0, 0]  # Reset velocity
                     return True
             
             # Check ZX view (right panel) - X horizontal, Z vertical
             elif pos[0] > self.current_view_width + self.middle_section_width:
                 zx_x = pos[0] - (self.current_view_width + self.middle_section_width)
-                ball_x_screen = self.ball_pos[0]
-                ball_z_screen = self.current_height // 2 - self.ball_pos[2]
+                ball_x_screen = int(self.ball_pos[0] * self.scale_x)
+                ball_z_screen = int((self.current_height // 2 - self.ball_pos[2]) * self.scale_y)
+                scaled_radius = int(self.ball_radius * self.global_scale)
                 
                 ball_distance = math.sqrt((zx_x - ball_x_screen)**2 + 
                                         (pos[1] - ball_z_screen)**2)
-                if ball_distance <= self.ball_radius:
+                if ball_distance <= scaled_radius:
                     self.dragging = True
                     self.active_view = "zx"
                     self.drag_offset = [zx_x - ball_x_screen, pos[1] - ball_z_screen]
@@ -862,27 +893,37 @@ class BernoulliSimulation:
         
         elif event_type == "motion" and self.dragging:
             if self.active_view == "xy":
-                # Update X and Y coordinates
-                new_x = pos[0] - self.drag_offset[0]
-                new_y = pos[1] - self.drag_offset[1]
+                # Update X and Y coordinates - convert back from screen space
+                screen_x = pos[0] - self.drag_offset[0]
+                screen_y = pos[1] - self.drag_offset[1]
                 
-                # Constrain to view bounds
-                self.ball_pos[0] = max(self.ball_radius, 
-                                     min(self.current_view_width - self.ball_radius, new_x))
-                self.ball_pos[1] = max(self.ball_radius, 
-                                     min(self.current_height - self.ball_radius, new_y))
+                # Convert screen coordinates back to ball coordinate space
+                new_x = screen_x / self.scale_x
+                new_y = screen_y / self.scale_y
+                
+                # Constrain to view bounds (in original coordinate space)
+                max_x = (self.current_view_width / self.scale_x) - self.ball_radius
+                max_y = (self.current_height / self.scale_y) - self.ball_radius
+                
+                self.ball_pos[0] = max(self.ball_radius, min(max_x, new_x))
+                self.ball_pos[1] = max(self.ball_radius, min(max_y, new_y))
             
             elif self.active_view == "zx":
                 # Update X and Z coordinates (X horizontal, Z vertical)
                 zx_x = pos[0] - (self.current_view_width + self.middle_section_width)
-                new_x = zx_x - self.drag_offset[0]
-                new_z = (self.current_height // 2 - pos[1]) + self.drag_offset[1]
+                screen_x = zx_x - self.drag_offset[0]
+                screen_z_pos = pos[1] - self.drag_offset[1]
+                
+                # Convert back to ball coordinate space
+                new_x = screen_x / self.scale_x
+                new_z = (self.current_height // 2 / self.scale_y - screen_z_pos / self.scale_y)
                 
                 # Constrain to bounds
-                self.ball_pos[0] = max(self.ball_radius, 
-                                     min(self.current_view_width - self.ball_radius, new_x))
-                self.ball_pos[2] = max(-self.current_height // 3, 
-                                     min(self.current_height // 3, new_z))
+                max_x = (self.current_view_width / self.scale_x) - self.ball_radius
+                max_z = self.current_height // 3 / self.scale_y
+                
+                self.ball_pos[0] = max(self.ball_radius, min(max_x, new_x))
+                self.ball_pos[2] = max(-max_z, min(max_z, new_z))
         
         return False
     
@@ -918,6 +959,12 @@ class BernoulliSimulation:
             elif event.type == pygame.VIDEORESIZE:
                 self.current_width = max(800, event.w)
                 self.current_height = max(600, event.h)
+                
+                # Update scaling factors
+                self.scale_x = self.current_width / BASE_WIDTH
+                self.scale_y = self.current_height / BASE_HEIGHT
+                self.global_scale = min(self.scale_x, self.scale_y)
+                
                 self.middle_section_width = int(self.current_width * 0.25)
                 self.current_view_width = (self.current_width - self.middle_section_width) // 2
                 
@@ -935,8 +982,8 @@ class BernoulliSimulation:
                 self.ball_pos[0] = min(self.ball_pos[0], self.current_view_width - self.ball_radius)
                 self.ball_pos[1] = min(self.ball_pos[1], self.current_height - self.ball_radius)
                 
-                # Update fonts
-                base_font_size = max(12, int(self.current_height / 50))
+                # Update fonts with scaling
+                base_font_size = max(12, int(self.current_height / 50 * self.global_scale))
                 preferred_fonts = ['Noto Sans TC', 'Microsoft JhengHei', 'Segoe UI', 'Arial']
                 self.font = pygame.font.SysFont(preferred_fonts, base_font_size)
                 self.title_font = pygame.font.SysFont(preferred_fonts, int(base_font_size * 1.5), bold=True)
