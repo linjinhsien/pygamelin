@@ -1168,8 +1168,12 @@ class BernoulliSimulation:
                             self.window_controls.is_maximized = False
                         else:
                             # Maximize window
-                            info = pygame.display.Info()
-                            self.resize_window(info.current_w, info.current_h)
+                            try:
+                                w, h = pygame.display.get_desktop_sizes()[0]
+                            except (AttributeError, IndexError):
+                                info = pygame.display.Info()
+                                w, h = info.current_w, info.current_h
+                            self.resize_window(w, h)
                             self.window_controls.is_maximized = True
                         continue
                     elif action == "drag_start":
@@ -1214,8 +1218,12 @@ class BernoulliSimulation:
                         self.resize_window(WIDTH, HEIGHT)
                         self.window_controls.is_maximized = False
                     else:
-                        info = pygame.display.Info()
-                        self.resize_window(info.current_w, info.current_h)
+                        try:
+                            w, h = pygame.display.get_desktop_sizes()[0]
+                        except (AttributeError, IndexError):
+                            info = pygame.display.Info()
+                            w, h = info.current_w, info.current_h
+                        self.resize_window(w, h)
                         self.window_controls.is_maximized = True
             
             elif event.type == pygame.VIDEORESIZE:
