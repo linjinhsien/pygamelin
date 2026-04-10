@@ -382,6 +382,31 @@ class BernoulliSimulation:
             
             self.ball_pos[0] = min(self.ball_pos[0], max_x)
             self.ball_pos[1] = min(self.ball_pos[1], max_y)
+
+    def get_desktop_resolution(self):
+        """Get desktop resolution with compatibility fallback for older pygame versions."""
+        try:
+            return pygame.display.get_desktop_sizes()[0]
+        except (AttributeError, IndexError):
+            modes = pygame.display.list_modes()
+            if modes and modes[0]:
+                return modes[0]
+            info = pygame.display.Info()
+            return info.current_w, info.current_h
+
+    def maximize_window(self):
+        """Resize window to desktop resolution and mark maximized state."""
+        w, h = self.get_desktop_resolution()
+        self.resize_window(w, h)
+        self.window_controls.is_maximized = True
+
+    def toggle_maximize_window(self):
+        """Toggle between default window size and maximized desktop size."""
+        if self.window_controls.is_maximized:
+            self.resize_window(WIDTH, HEIGHT)
+            self.window_controls.is_maximized = False
+        else:
+            self.maximize_window()
     
     def calculate_bernoulli_effect(self):
         """Calculate Bernoulli effect with improved accuracy"""
@@ -1162,19 +1187,7 @@ class BernoulliSimulation:
                         pygame.display.iconify()
                         continue
                     elif action == "maximize":
-                        if self.window_controls.is_maximized:
-                            # Restore to normal size
-                            self.resize_window(WIDTH, HEIGHT)
-                            self.window_controls.is_maximized = False
-                        else:
-                            # Maximize window
-                            try:
-                                w, h = pygame.display.get_desktop_sizes()[0]
-                            except (AttributeError, IndexError):
-                                info = pygame.display.Info()
-                                w, h = info.current_w, info.current_h
-                            self.resize_window(w, h)
-                            self.window_controls.is_maximized = True
+                        self.toggle_maximize_window()
                         continue
                     elif action == "drag_start":
                         self.window_controls.dragging_window = True
@@ -1214,17 +1227,7 @@ class BernoulliSimulation:
                     return False
                 elif event.key == pygame.K_F11:
                     # Toggle fullscreen
-                    if self.window_controls.is_maximized:
-                        self.resize_window(WIDTH, HEIGHT)
-                        self.window_controls.is_maximized = False
-                    else:
-                        try:
-                            w, h = pygame.display.get_desktop_sizes()[0]
-                        except (AttributeError, IndexError):
-                            info = pygame.display.Info()
-                            w, h = info.current_w, info.current_h
-                        self.resize_window(w, h)
-                        self.window_controls.is_maximized = True
+                    self.toggle_maximize_window()
             
             elif event.type == pygame.VIDEORESIZE:
                 self.resize_window(event.w, event.h)
